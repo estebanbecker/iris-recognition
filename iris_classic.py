@@ -2,7 +2,9 @@ import os
 import cv2
 import numpy as np
 from math import cos, sin, pi
-from skimage.filters import gabor_kernel
+from skimage.filters import gabor_kernel, gabor
+from scipy import ndimage as ndi
+
 
 class circle:
     def __init__(self, x, y, r):
@@ -81,51 +83,46 @@ def exploding_circle_iris(image, cx, cy, step_seed_point = 3, step_radius = 1, m
 
     return best_circle
 
-def exploding_circle_pupil(image, cx, cy, step_seed_point = 3, step_radius = 10, min_radius = 200, max_radius = 300, step_angle = 2, left = True):
+def exploding_circle_pupil(image, cx, cy, step_seed_point = 3, step_radius = 10, min_radius = 200, max_radius = 400, step_angle = 2, left = True):
 
     max_diff = 0
     best_circle=circle(0,0,0)
 
-    for dx in range(-5,6):
-        for dy in range(-5,6):
-            x1 = cx + step_seed_point * dx
-            y1 = cy + step_seed_point * dy
+    previous_brighness = None
 
-            previous_brighness = None
+    if left == True:
+        i=1
+    else :
+        i=0
 
-            if left == True:
-                i=1
-            else :
-                i=0
+    for radius in range(min_radius,max_radius,step_radius):
+        brightness_sum = 0
 
-            for radius in range(min_radius,max_radius,step_radius):
-                brightness_sum = 0
+        image_copie=image.copy()
 
-                image_copie=image.copy()
+        for angle in range(-45+180*i,45+180*i,step_angle):
+            
+            x2 = int(radius * cos((angle*pi)/180) + cx)
+            y2 = int(radius * sin((angle)*pi/180) + cy)
 
-                for angle in range(-45+180*i,45+180*i,step_angle):
-                    
-                    x2 = int(radius * cos((angle*pi)/180) + x1)
-                    y2 = int(radius * sin((angle)*pi/180) + y1)
+            #check that the coordinates are inside the image
+            if x2<0 or x2>=image.shape[1] or y2<0 or y2>=image.shape[0]:
+                break
+            
+            #image_copie[y2,x2]=255
+            ##cv2.imshow("image_copie",image_copie)
+            ##cv2.waitKey()
 
-                    #check that the coordinates are inside the image
-                    if x2<0 or x2>=image.shape[1] or y2<0 or y2>=image.shape[0]:
-                        break
-                    
-                    #image_copie[y2,x2]=255
-                    #cv2.imshow("image_copie",image_copie)
-                    #cv2.waitKey()
+            brightness_sum += image[y2,x2]
+        
+        average_brightness = float(brightness_sum) / ((120)/ float(step_angle))
 
-                    brightness_sum += image[y2,x2]
-                
-                average_brightness = float(brightness_sum) / ((120)/ float(step_angle))
-
-                if previous_brighness != None:
-                    if max_diff<(average_brightness-previous_brighness):
-                        max_diff =(average_brightness-previous_brighness)
-                        best_circle = circle(x1,y1,radius-step_radius)
-                
-                previous_brighness = average_brightness
+        if previous_brighness != None:
+            if max_diff<(average_brightness-previous_brighness):
+                max_diff =(average_brightness-previous_brighness)
+                best_circle = circle(cx,cy,radius-step_radius)
+        
+        previous_brighness = average_brightness
 
 
     return best_circle
@@ -142,31 +139,82 @@ def gabor_filter(image, circle_iris, left_iris_circle, right_iris_circle, step_r
 
     code=[]
     #Loop for each radius
+    image_copy=image.copy()
     for i in range(8):
 
-        radius_left = circle_iris.r + step_radius * (i+1) * (left_iris_circle.r - circle_iris.r)
+        radius_left = circle_iris.r + step_radius * (i+2) * (left_iris_circle.r - circle_iris.r)
         #Loop for each angle left
+
         for angle in range(135,225,11):
-            x2 = int(radius * cos((angle*pi)/180) + circle_iris.x)
-            y2 = int(radius * sin((angle)*pi/180) + circle_iris.y)
+            x2 = int(radius_left * cos((angle*pi)/180) + circle_iris.x)
+            y2 = int(radius_left * sin((angle)*pi/180) + circle_iris.y)
+            image_copy[y2,x2]=255
+            #cv2.imshow("image_copy",image_copy)
+            #cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
+            #cv2.waitKey()
+            for gabor_filter in kernels:
+                data=(ndi.convolve(image[y2-21:y2+21,x2-21:x2+21], gabor_filter,mode='wrap'))
+                
+                #Sum of the gabor filter
+                sum=np.sum(data)
+                
+                if sum.real>0:
+                    code.append(1)
+                else:
+                    code.append(0)
+                if sum.imag>0:
+                    code.append(1)
+                else:
+                    code.append(0) 
+        
+        radius_right=circle_iris.r + step_radius * (i+2) * (right_iris_circle.r - circle_iris.r)
+        #Loop for right angle
+        for angle in range(-45,45,11):
+            x2 = int(radius_right * cos((angle*pi)/180) + circle_iris.x)
+            y2 = int(radius_right * sin((angle)*pi/180) + circle_iris.y)
+            image_copy[y2,x2]=255
+            #cv2.imshow("image_copy",image_copy)
+            #cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
+            #cv2.waitKey()
 
             for gabor_filter in kernels:
-                code.append(gabor_filter(image[y2-10:y2+10,x2-10:x2+10]))
-    
-    print(code)
+                data=(ndi.convolve(image[y2-21:y2+21,x2-21:x2+21], gabor_filter,mode='wrap'))
+                
+                #Sum of the gabor filter
+                sum=np.sum(data)
+                
+                if sum.real>0:
+                    code.append(1)
+                else:
+                    code.append(0)
+                if sum.imag>0:
+                    code.append(1)
+                else:
+                    code.append(0)                    
+
     return code
 
 
+#Function to compare two codes
+def compare(code1,code2):
 
+    same=0
+    for i in range(len(code1)):
+        if code1[i]==code2[i]:
+            same+=1
+    
+    return same/len(code1)
 
 
 def main(data_path):
     # Get files from data path
+    code_dict={}
     filename_list = [
         f for f in os.listdir(data_path) if os.path.isfile(os.path.join(data_path, f))
     ]
 
     for filename in filename_list:
+        print("Analysing image: " + filename)
         # Read image
         img = cv2.imread(os.path.join(data_path, filename))
 
@@ -189,17 +237,12 @@ def main(data_path):
         cv2.circle(img_right, (right_iris_circle.x, right_iris_circle.y), right_iris_circle.r, (0, 255, 0), thickness=2)
 
         # Gabor filters
-        code = gabor_filter(gray, pupil_circle, left_iris_circle, right_iris_circle)
-        # TODO: Add Gabor filters
-        cv2.imshow("Original image", img)
-        cv2.imshow("Left iris", img_left)
-        cv2.imshow("Right iris", img_right)
-        cv2.imshow("Gray", gray)
-        cv2.imshow("No glare", img_no_glare)
-        key = cv2.waitKey()
-        if key == ord("x"):
-            break
+        code_dict[filename]= gabor_filter(gray, pupil_circle, left_iris_circle, right_iris_circle)
 
+    #Compare two image with the same iris
+    for i in range(len(code_dict)):
+        for j in range(i+1,len(code_dict)):
+            print(str(compare(code_dict[filename_list[i]],code_dict[filename_list[j]]))+" "+filename_list[i]+" "+filename_list[j])
 
 if __name__ == "__main__":
     data_path = "./iris_database_train"
