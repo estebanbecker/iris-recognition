@@ -1,9 +1,14 @@
 import os
 import cv2
 import numpy as np
-from math import cos, sin
+from math import cos, sin, pi
+from skimage.filters import gabor_kernel
 
-
+class circle:
+    def __init__(self, x, y, r):
+        self.x = x
+        self.y = y
+        self.r = r
 def remove_glare(image):
     H = cv2.calcHist([image], [0], None, [256], [0, 256])
     # plt.plot(H[150:])
@@ -41,15 +46,13 @@ def remove_glare(image):
 
     return image, cx, cy
 
-def exploding_circle(image, cx, cy, step_seed_point = 15, step_radius = 5, min_radius = 20, max_radius = 100, step_angle = 10):
+def exploding_circle_iris(image, cx, cy, step_seed_point = 3, step_radius = 1, min_radius = 35, max_radius = 150, step_angle = 5):
 
     max_diff = 0
-    best_x = 0
-    best_y = 0
-    best_radius = 0
+    best_circle=circle(0,0,0)
 
-    for dx in range(-1,2):
-        for dy in range(-1,2):
+    for dx in range(-5,6):
+        for dy in range(-5,6):
             x1 = cx + step_seed_point * dx
             y1 = cy + step_seed_point * dy
 
@@ -59,39 +62,100 @@ def exploding_circle(image, cx, cy, step_seed_point = 15, step_radius = 5, min_r
 
                 brightness_sum = 0
 
-
                 for angle in range(0,360,step_angle):
                     
-                    x2 = int(radius * cos(angle) + x1)
-                    y2 = int(radius * sin(angle) + y1)
-                    
-                    #if x2>
-                    brightness_sum += image[x2, y2]
+                    x2 = int(radius * cos((angle*pi)/180) + x1)
+                    y2 = int(radius * sin((angle)*pi/180) + y1)
 
+                    brightness_sum += image[y2,x2]
                 
-                image_circle = np.copy(image)
-                cv2.circle(image_circle,(x1,y1),radius,(255, 0, 0))
-                cv2.imshow("circle", image_circle)
-                key = cv2.waitKey()          
-
-                
-                average_brightness = brightness_sum / ((360-0)/ step_angle)
+                average_brightness = float(brightness_sum) / ((360-0)/ float(step_angle))
 
                 if previous_brighness != None:
-                    if max_diff<abs(previous_brighness-average_brightness):
-                        max_diff = abs(previous_brighness-average_brightness)
-                        best_x = x1
-                        best_y = y1
-                        best_radius = radius
+                    if max_diff<(average_brightness-previous_brighness):
+                        max_diff =(average_brightness-previous_brighness)
+                        best_circle = circle(x1,y1,radius)
                 
                 previous_brighness = average_brightness
 
-    image_circle = np.copy(image)
-    cv2.circle(image_circle,(best_x,best_y),best_radius,(255, 0, 0))
-    cv2.imshow("best circle", image_circle)
-    key = cv2.waitKey()   
 
-    return 0
+    return best_circle
+
+def exploding_circle_pupil(image, cx, cy, step_seed_point = 3, step_radius = 10, min_radius = 200, max_radius = 300, step_angle = 2, left = True):
+
+    max_diff = 0
+    best_circle=circle(0,0,0)
+
+    for dx in range(-5,6):
+        for dy in range(-5,6):
+            x1 = cx + step_seed_point * dx
+            y1 = cy + step_seed_point * dy
+
+            previous_brighness = None
+
+            if left == True:
+                i=1
+            else :
+                i=0
+
+            for radius in range(min_radius,max_radius,step_radius):
+                brightness_sum = 0
+
+                image_copie=image.copy()
+
+                for angle in range(-45+180*i,45+180*i,step_angle):
+                    
+                    x2 = int(radius * cos((angle*pi)/180) + x1)
+                    y2 = int(radius * sin((angle)*pi/180) + y1)
+
+                    #check that the coordinates are inside the image
+                    if x2<0 or x2>=image.shape[1] or y2<0 or y2>=image.shape[0]:
+                        break
+                    
+                    #image_copie[y2,x2]=255
+                    #cv2.imshow("image_copie",image_copie)
+                    #cv2.waitKey()
+
+                    brightness_sum += image[y2,x2]
+                
+                average_brightness = float(brightness_sum) / ((120)/ float(step_angle))
+
+                if previous_brighness != None:
+                    if max_diff<(average_brightness-previous_brighness):
+                        max_diff =(average_brightness-previous_brighness)
+                        best_circle = circle(x1,y1,radius-step_radius)
+                
+                previous_brighness = average_brightness
+
+
+    return best_circle
+
+#Gabor filter extration from the image fonction
+def gabor_filter(image, circle_iris, left_iris_circle, right_iris_circle, step_radius=0.075):
+
+    kernels = []
+    sigma = 2
+    for theta in range(8):
+        t = theta / 8. * np.pi
+        kernel = (gabor_kernel(0.15, theta=t, sigma_x=sigma, sigma_y=sigma))
+        kernels.append(kernel)
+
+    code=[]
+    #Loop for each radius
+    for i in range(8):
+
+        radius_left = circle_iris.r + step_radius * (i+1) * (left_iris_circle.r - circle_iris.r)
+        #Loop for each angle left
+        for angle in range(135,225,11):
+            x2 = int(radius * cos((angle*pi)/180) + circle_iris.x)
+            y2 = int(radius * sin((angle)*pi/180) + circle_iris.y)
+
+            for gabor_filter in kernels:
+                code.append(gabor_filter(image[y2-10:y2+10,x2-10:x2+10]))
+    
+    print(code)
+    return code
+
 
 
 
@@ -113,12 +177,23 @@ def main(data_path):
         img_no_glare, x, y = remove_glare(gray)
 
         # Exploding circle algorithm
-        exploding_circle(img_no_glare,x,y)
+        pupil_circle = exploding_circle_iris(img_no_glare,x,y)
+        left_iris_circle = exploding_circle_pupil(gray,x,y,min_radius=pupil_circle.r+50)
+        right_iris_circle = exploding_circle_pupil(gray,x,y,min_radius=pupil_circle.r+50,left=False)
+
+        # Draw circles
+        cv2.circle(img, (pupil_circle.x, pupil_circle.y), pupil_circle.r, (0, 255, 0), thickness=2)
+        img_left=img.copy()
+        cv2.circle(img_left, (left_iris_circle.x, left_iris_circle.y), left_iris_circle.r, (0, 255, 0), thickness=2)
+        img_right=img.copy()
+        cv2.circle(img_right, (right_iris_circle.x, right_iris_circle.y), right_iris_circle.r, (0, 255, 0), thickness=2)
 
         # Gabor filters
-        # TODO
-
+        code = gabor_filter(gray, pupil_circle, left_iris_circle, right_iris_circle)
+        # TODO: Add Gabor filters
         cv2.imshow("Original image", img)
+        cv2.imshow("Left iris", img_left)
+        cv2.imshow("Right iris", img_right)
         cv2.imshow("Gray", gray)
         cv2.imshow("No glare", img_no_glare)
         key = cv2.waitKey()
