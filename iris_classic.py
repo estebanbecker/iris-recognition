@@ -108,10 +108,6 @@ def exploding_circle_pupil(image, cx, cy, step_seed_point = 3, step_radius = 10,
             #check that the coordinates are inside the image
             if x2<0 or x2>=image.shape[1] or y2<0 or y2>=image.shape[0]:
                 break
-            
-            #image_copie[y2,x2]=255
-            ##cv2.imshow("image_copie",image_copie)
-            ##cv2.waitKey()
 
             brightness_sum += image[y2,x2]
         
@@ -138,26 +134,30 @@ def gabor_filter(image, circle_iris, left_iris_circle, right_iris_circle, step_r
         kernels.append(kernel)
 
     code=[]
+    j=0
+    k=0
     #Loop for each radius
     image_copy=image.copy()
     for i in range(8):
 
-        radius_left = circle_iris.r + step_radius * (i+2) * (left_iris_circle.r - circle_iris.r)
+        radius_left = circle_iris.r + step_radius * (i+1) * (left_iris_circle.r - circle_iris.r)
         #Loop for each angle left
 
-        for angle in range(135,225,11):
-            x2 = int(radius_left * cos((angle*pi)/180) + circle_iris.x)
-            y2 = int(radius_left * sin((angle)*pi/180) + circle_iris.y)
+        for angle_i in range(8):
+            angle=(angle_i/8)*(pi/2)+(3*pi)/4
+            j=j+1
+            x2 = int(radius_left * cos(angle) + circle_iris.x)
+            y2 = int(radius_left * sin(angle) + circle_iris.y)
             image_copy[y2,x2]=255
-            #cv2.imshow("image_copy",image_copy)
-            #cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
-            #cv2.waitKey()
+            cv2.imshow("image_copy",image_copy)
+            cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
+            cv2.waitKey()
             for gabor_filter in kernels:
-                data=(ndi.convolve(image[y2-21:y2+21,x2-21:x2+21], gabor_filter,mode='wrap'))
+                data=(ndi.convolve(image[y2-10:y2+10,x2-10:x2+10], gabor_filter,mode='wrap'))
                 
                 #Sum of the gabor filter
                 sum=np.sum(data)
-                
+                k=k+2
                 if sum.real>0:
                     code.append(1)
                 else:
@@ -167,22 +167,24 @@ def gabor_filter(image, circle_iris, left_iris_circle, right_iris_circle, step_r
                 else:
                     code.append(0) 
         
-        radius_right=circle_iris.r + step_radius * (i+2) * (right_iris_circle.r - circle_iris.r)
+        radius_right=circle_iris.r + step_radius * (i+1) * (right_iris_circle.r - circle_iris.r)
         #Loop for right angle
-        for angle in range(-45,45,11):
-            x2 = int(radius_right * cos((angle*pi)/180) + circle_iris.x)
-            y2 = int(radius_right * sin((angle)*pi/180) + circle_iris.y)
+        for angle_i in range(8):
+            angle=(angle_i/8)*(pi/2)-pi/4
+            j=j+1
+            x2 = int(radius_right * cos(angle) + circle_iris.x)
+            y2 = int(radius_right * sin(angle) + circle_iris.y)
             image_copy[y2,x2]=255
-            #cv2.imshow("image_copy",image_copy)
-            #cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
-            #cv2.waitKey()
+            cv2.imshow("image_copy",image_copy)
+            cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
+            cv2.waitKey()
 
             for gabor_filter in kernels:
-                data=(ndi.convolve(image[y2-21:y2+21,x2-21:x2+21], gabor_filter,mode='wrap'))
+                data=(ndi.convolve(image[y2-10:y2+10,x2-10:x2+10], gabor_filter,mode='wrap'))
                 
                 #Sum of the gabor filter
                 sum=np.sum(data)
-                
+                k=k+2
                 if sum.real>0:
                     code.append(1)
                 else:
