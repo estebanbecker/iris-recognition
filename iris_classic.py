@@ -259,7 +259,7 @@ def main(data_path):
                     best=compare(code,code_dict[filename2])
                     best_match=filename2
         if best>0.85:
-            print(filename1 +": Identified as"+best_match[4]+" "+str(best))
+            print(filename1 +": Identified as "+best_match[4]+" "+str(best))
         else:
             print(filename1 +": Not identified")
 
