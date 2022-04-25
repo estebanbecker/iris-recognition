@@ -137,7 +137,6 @@ def gabor_filter(image, circle_iris, left_iris_circle, right_iris_circle, step_r
     j=0
     k=0
     #Loop for each radius
-    image_copy=image.copy()
     for i in range(8):
 
         radius_left = circle_iris.r + step_radius * (i+1) * (left_iris_circle.r - circle_iris.r)
@@ -148,12 +147,8 @@ def gabor_filter(image, circle_iris, left_iris_circle, right_iris_circle, step_r
             j=j+1
             x2 = int(radius_left * cos(angle) + circle_iris.x)
             y2 = int(radius_left * sin(angle) + circle_iris.y)
-            image_copy[y2,x2]=255
-            cv2.imshow("image_copy",image_copy)
-            cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
-            cv2.waitKey()
             for gabor_filter in kernels:
-                data=(ndi.convolve(image[y2-10:y2+10,x2-10:x2+10], gabor_filter,mode='wrap'))
+                data=(ndi.convolve(image[y2-10:y2+10,x2-10:x2+10], gabor_filter))
                 
                 #Sum of the gabor filter
                 sum=np.sum(data)
@@ -174,13 +169,9 @@ def gabor_filter(image, circle_iris, left_iris_circle, right_iris_circle, step_r
             j=j+1
             x2 = int(radius_right * cos(angle) + circle_iris.x)
             y2 = int(radius_right * sin(angle) + circle_iris.y)
-            image_copy[y2,x2]=255
-            cv2.imshow("image_copy",image_copy)
-            cv2.imshow("analyse-place",image[y2-10:y2+10,x2-10:x2+10])
-            cv2.waitKey()
 
             for gabor_filter in kernels:
-                data=(ndi.convolve(image[y2-10:y2+10,x2-10:x2+10], gabor_filter,mode='wrap'))
+                data=(ndi.convolve(image[y2-10:y2+10,x2-10:x2+10], gabor_filter))
                 
                 #Sum of the gabor filter
                 sum=np.sum(data)
@@ -231,22 +222,49 @@ def main(data_path):
         left_iris_circle = exploding_circle_pupil(gray,x,y,min_radius=pupil_circle.r+50)
         right_iris_circle = exploding_circle_pupil(gray,x,y,min_radius=pupil_circle.r+50,left=False)
 
-        # Draw circles
-        cv2.circle(img, (pupil_circle.x, pupil_circle.y), pupil_circle.r, (0, 255, 0), thickness=2)
-        img_left=img.copy()
-        cv2.circle(img_left, (left_iris_circle.x, left_iris_circle.y), left_iris_circle.r, (0, 255, 0), thickness=2)
-        img_right=img.copy()
-        cv2.circle(img_right, (right_iris_circle.x, right_iris_circle.y), right_iris_circle.r, (0, 255, 0), thickness=2)
-
         # Gabor filters
         code_dict[filename]= gabor_filter(gray, pupil_circle, left_iris_circle, right_iris_circle)
 
-    #Compare two image with the same iris
-    for i in range(len(code_dict)):
-        for j in range(i+1,len(code_dict)):
-            print(str(compare(code_dict[filename_list[i]],code_dict[filename_list[j]]))+" "+filename_list[i]+" "+filename_list[j])
+
+    # Compare codes
+    filename_list_test = [
+        f for f in os.listdir("./iris_database_test") if os.path.isfile(os.path.join("./iris_database_test", f))
+    ]
+
+
+    
+    for filename1 in filename_list_test:
+        best = 0.0
+        
+        print("Analysing image: " + filename1)
+        # Read image
+        img = cv2.imread(os.path.join("./iris_database_test", filename1))
+
+        # Convert to gray
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Remove glare
+        img_no_glare, x, y = remove_glare(gray)
+
+        # Exploding circle algorithm
+        pupil_circle = exploding_circle_iris(img_no_glare,x,y)
+        left_iris_circle = exploding_circle_pupil(gray,x,y,min_radius=pupil_circle.r+50)
+        right_iris_circle = exploding_circle_pupil(gray,x,y,min_radius=pupil_circle.r+50,left=False)
+
+        code = gabor_filter(gray, pupil_circle, left_iris_circle, right_iris_circle)
+
+        for filename2 in filename_list:
+            if filename1 != filename2:
+                if compare(code,code_dict[filename2])>best:
+                    best=compare(code,code_dict[filename2])
+                    best_match=filename2
+        if best>0.85:
+            print(filename1 +": Identified as"+best_match[4]+" "+str(best))
+        else:
+            print(filename1 +": Not identified")
 
 if __name__ == "__main__":
     data_path = "./iris_database_train"
     main(data_path)
+
 
