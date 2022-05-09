@@ -7,6 +7,8 @@ from torchvision import transforms as T
 from torchvision import models
 from sklearn.decomposition import PCA
 from sklearn import svm, metrics
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 
 TRAIN_PERC = 0.75
@@ -35,7 +37,7 @@ def main(path):
     print(vgg)
 
     # TODO: change the network classifier to the nn.Flatten layer
-    print("--- Modified VGG-16:")
+    #print("--- Modified VGG-16:")
     #f = nn.Flatten(1,-1)
     #vgg_f = f(vgg)
     #print(vgg_f)
@@ -78,8 +80,15 @@ def main(path):
 
     # TODO: train svm on train features and test on test features
 
-    # print metrics
-    #print(metrics.classification_report(test_labels, Y_predict))
+    clf = make_pipeline(StandardScaler(), SVC(gamma='auto'))
+    clf.fit(pca_train_feature, train_labels)
+
+    Y_predict=[]
+    for i in range(len(test_labels)):
+        Y_predict.append(clf.predict(pca_test_feature[i]))
+
+
+    print(metrics.classification_report(test_labels, Y_predict))
 
 if __name__ == "__main__":
     path_mmu = "./mmu_iris"
