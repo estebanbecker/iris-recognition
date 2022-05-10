@@ -6,9 +6,10 @@ from torchvision.datasets import ImageFolder
 from torchvision import transforms as T
 from torchvision import models
 from sklearn.decomposition import PCA
-from sklearn import svm, metrics
+from sklearn import metrics
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 import numpy as np
 
 TRAIN_PERC = 0.75
@@ -37,10 +38,10 @@ def main(path):
     print(vgg)
 
     # TODO: change the network classifier to the nn.Flatten layer
-    #print("--- Modified VGG-16:")
-    #f = nn.Flatten(1,-1)
-    #vgg_f = f(vgg)
-    #print(vgg_f)
+    print("--- Modified VGG-16:")
+    f = nn.Flatten(1,-1)
+    vgg.classifier = f
+    print(vgg)
 
     # extract features using VGG-16 in eval mode - save them in a list
     vgg.eval()
@@ -62,21 +63,12 @@ def main(path):
     train_labels = np.ravel(train_labels)
     test_labels = np.ravel(test_labels)
     # TODO: PCA decomposition
-
-    pca=PCA(n_components=30)
-
-    pca_train_feature=[]
-
-    for X in train_features:
+    pca=PCA(n_components=25)
+    
         
-        pca_train_feature.append(pca.fit_transform(X))
+    pca_train_feature = pca.fit_transform(train_features)
 
-    pca_test_feature=[]
-
-    for X in test_features:
-
-        pca_test_feature.append(pca.transform(x))        
-
+    pca_test_feature = pca.transform(test_features)
 
     # TODO: train svm on train features and test on test features
 
@@ -84,8 +76,9 @@ def main(path):
     clf.fit(pca_train_feature, train_labels)
 
     Y_predict=[]
-    for i in range(len(test_labels)):
-        Y_predict.append(clf.predict(pca_test_feature[i]))
+    #for i in range(len(test_labels)):
+    Y_predict = clf.predict(pca_test_feature)
+    print(Y_predict)
 
 
     print(metrics.classification_report(test_labels, Y_predict))
